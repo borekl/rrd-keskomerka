@@ -1,0 +1,211 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use v5.10;
+
+use RRDTool::OO;
+use XML::Twig;
+use LWP::Simple;
+use POSIX qw(strftime);
+use Template;
+use FindBin qw($Bin);
+
+#--- definitions
+
+my $rrdfile = "$Bin/keskomerka.rrd";
+my $dstdir = "$Bin/html";
+my ($img_w, $img_h) = (800, 160);
+
+#--- get RRDTool::OO instance
+
+my $rrd = RRDTool::OO->new(
+  file => $rrdfile
+);
+
+#--- create RRD file if it does not already exist
+
+if(!-f $rrdfile) {
+  $rrd->create(
+    step => 3600,
+    data_source => {
+      name => 'queue',
+      type => 'GAUGE'
+    },
+    data_source => {
+      name => 'review',
+      type => 'GAUGE'
+    },
+    # 1 year of data
+    archive => {
+      cpoints => 1,
+      rows => 8766
+    },
+    # 20 years of data / 1 day average
+    archive => {
+      cpoints => 24,
+      cfunc => 'AVERAGE',
+      rows => 7305
+    }
+  );
+}
+
+#--- get data from remote source
+
+my $xml = XML::Twig->new();
+$xml->parse(
+  LWP::Simple::get('http://keskomerka.reviewer.cz/keskomerka.xml')
+);
+
+#--- update RRD database file
+
+$rrd->update(
+  values => {
+    queue => $xml->root->first_child_text('queue'),
+    review => $xml->root->first_child_text('review')
+  }
+);
+
+#--- create graphs
+
+$rrd->graph(
+  image => "$dstdir/keskomerka-week.png",
+  start => (time() - 7*24*3600),
+  end => time(),
+  lower_limit => 0,
+  width => $img_w,
+  height => $img_h,
+  draw => {
+    dsname => 'queue',
+    name => 'queue',
+    type => 'area',
+    color => '00CC00',
+    legend => 'Waiting queue'
+  },
+  draw => {
+    type => 'hidden',
+    name => 'last_queue',
+    vdef => 'queue,LAST'
+  },
+  gprint => {
+    draw => 'last_queue',
+    format => '%3.0lf\l',
+  },
+  draw => {
+    dsname => 'review',
+    name => 'review',
+    type => 'line',
+    thickness => 1,
+    color => '0000FF',
+    legend => 'In process   '
+  },
+  draw => {
+    type => 'hidden',
+    name => 'last_review',
+    vdef => 'review,LAST'
+  },
+  gprint => {
+    draw => 'last_review',
+    format => '%3.0lf\n',
+  },
+);
+
+$rrd->graph(
+  image => "$dstdir/keskomerka-month.png",
+  start => (time() - 30*24*3600),
+  end => time(),
+  lower_limit => 0,
+  width => $img_w,
+  height => $img_h,
+  draw => {
+    dsname => 'queue',
+    name => 'queue',
+    type => 'area',
+    color => '00CC00',
+    legend => 'Waiting queue'
+  },
+  draw => {
+    type => 'hidden',
+    name => 'last_queue',
+    vdef => 'queue,LAST'
+  },
+  gprint => {
+    draw => 'last_queue',
+    format => '%3.0lf\l',
+  },
+  draw => {
+    dsname => 'review',
+    name => 'review',
+    type => 'line',
+    thickness => 1,
+    color => '0000FF',
+    legend => 'In process   '
+  },
+  draw => {
+    type => 'hidden',
+    name => 'last_review',
+    vdef => 'review,LAST'
+  },
+  gprint => {
+    draw => 'last_review',
+    format => '%3.0lf\n',
+  },
+);
+
+$rrd->graph(
+  image => "$dstdir/keskomerka-year.png",
+  start => (time() - 365*24*3600),
+  end => time(),
+  lower_limit => 0,
+  width => $img_w,
+  height => $img_h,
+  draw => {
+    dsname => 'queue',
+    name => 'queue',
+    type => 'area',
+    color => '00CC00',
+    legend => 'Waiting queue'
+  },
+  draw => {
+    type => 'hidden',
+    name => 'last_queue',
+    vdef => 'queue,LAST'
+  },
+  gprint => {
+    draw => 'last_queue',
+    format => '%3.0lf\l',
+  },
+  draw => {
+    dsname => 'review',
+    name => 'review',
+    type => 'line',
+    thickness => 1,
+    color => '0000FF',
+    legend => 'In process   '
+  },
+  draw => {
+    type => 'hidden',
+    name => 'last_review',
+    vdef => 'review,LAST'
+  },
+  gprint => {
+    draw => 'last_review',
+    format => '%3.0lf\n',
+  },
+);
+
+#--- create html file
+
+my $tt = Template->new({
+  ABSOLUTE => 1,
+  ENCODING => 'utf8',
+});
+
+$tt->process(
+  "$Bin/index.tt",
+  {
+    gentime => strftime('%c', localtime())
+  },
+  "$dstdir/index.html",
+  { binmode => ':utf8' }
+) || die $tt->error(), "\n";

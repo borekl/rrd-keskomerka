@@ -1,0 +1,32 @@
+<!doctype html>
+
+<html>
+
+<head>
+  <title>Keškoměrka</title>
+  <style>
+    .bold { font-weight: bold; }
+  </style>
+</head>
+
+<body>
+
+<h1>Keškoměrka</h1>
+
+<p>Naposledy obnoveno: [% gentime %]</p>
+
+<p><span class="bold">Poslední týden</span><br>
+<img src="keskomerka-week.png"></p>
+
+<p><span class="bold">Poslední měsíc</span><br>
+<img src="keskomerka-month.png"></p>
+
+<p><span class="bold">Poslední rok</span><br>
+<img src="keskomerka-year.png"></p>
+
+<p>Grafy ze starších dat jsou k vidění
+<a href="../keskomerka-old/">zde</a></p>
+
+</body>
+
+</html>
